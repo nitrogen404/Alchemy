@@ -3,6 +3,7 @@ import json
 import requests
 from dotenv import load_dotenv
 import pprint
+import time
 load_dotenv()
 
 
@@ -39,6 +40,45 @@ def NFTMedata(base_url, contractAddr, token_list):
 # pprint.pprint(NFTMedata(base_url, bored_ape, tokens))
 
 
+def getOwnersfor_collection(contractAddr):  # returns a list 
+    request_url = base_url + "/getOwnersForCollection/?contractAddress=" + contractAddr
+    api_data = requests.get(request_url)
+    data = api_data.json()
+    return data['ownerAddresses']
+
+wallets = getOwnersfor_collection(bored_ape)
+
+def wallet_info(wallets):
+    list_ = []
+    for i in range(1, 10):
+        request_url = base_url + "/getNFTs/?owner=" + wallets[i] + "&withMetadata=false" 
+        api_data = requests.get(request_url)
+        data = api_data.json()
+        data.pop('blockHash')
+        data.update({'walletAddress': wallets[i]})
+        list_.append(data)
+    return list_
+
+# pprint.pprint(wallet_info(wallets))
+# temp_dict.update({'collection_address': obj['contract']['address']})
+# temp_dict.update({'tokenID': int(obj['id']['tokenId'], 16)})
+# temp_dict.update({'wallet_address': dictionary['walletAddress']}) 
+
+def NFT_owned_by_wallet(list_):
+    cleaned_list = []
+    for dictionary in list_:
+        temp_dict = dict()
+        temp_dict.update({'wallet_address': dictionary['walletAddress']})
+        sub_list = dictionary['ownedNfts']
+        temp_list = []
+        for small_dict in sub_list:
+            temp_list.append({'collection_addr':small_dict['contract']['address'], 'tokenID': int(small_dict['id']['tokenId'], 16)})
+        temp_dict.update({'assets': temp_list})
+        cleaned_list.append(temp_dict)
+
+    return cleaned_list
+
+pprint.pprint(NFT_owned_by_wallet(wallet_info(wallets)))
 
 def get_tokenData(data_list):
     token_list = []
@@ -58,4 +98,6 @@ def get_tokenData(data_list):
     return token_list
 
 
-pprint.pprint(get_tokenData(nfts_for_collection(base_url, bored_ape)))
+# pprint.pprint(get_tokenData(nfts_for_collection(base_url, bored_ape)))
+
+

@@ -2,11 +2,8 @@ import os
 import json
 import requests
 from dotenv import load_dotenv
-from supabase import create_client, Client
-import os
 import pprint
 load_dotenv()
-
 
 base_url = "https://eth-mainnet.g.alchemy.com/nft/v2/" + os.environ.get("ALCHEMY_API_KEY")
 bored_ape = "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
@@ -17,6 +14,7 @@ def nftCollections(url, address):
     request_url = url + "/getContractMetadata/?contractAddress=" + address
     collection_data = requests.get(request_url)
     return [collection_data.json()]
+
 
 def nfts_for_collection(base_url, contractAddr):  # returns a list of dictionaries
     request_url = base_url + "/getNFTsForCollection/?contractAddress=" + contractAddr + "&start=0&withMetadata=true"
@@ -45,32 +43,46 @@ def get_tokenData(data_list):
     return token_list
 
 
-def insertData(supabase, jsonList, table_name):
-    data = supabase.table(str(table_name)).insert(jsonList).execute()
+def getOwnersfor_collection(contractAddr):  # returns a list 
+    request_url = base_url + "/getOwnersForCollection/?contractAddress=" + contractAddr
+    api_data = requests.get(request_url)
+    data = api_data.json()
+    return data['ownerAddresses']
 
 
-def displayRows(supabase, table):
-    pprint.pprint(supabase.table(str(table)).select("*").execute())
-    
+def wallet_info(wallets):
+    list_ = []
+    for i in range(1, 10):
+        request_url = base_url + "/getNFTs/?owner=" + wallets[i] + "&withMetadata=false" 
+        api_data = requests.get(request_url)
+        data = api_data.json()
+        data.pop('blockHash')
+        data.update({'walletAddress': wallets[i]})
+        list_.append(data)
+    return list_
 
 
-def deleteRow(supabase): # remove the address!!!!
-    data = supabase.table("NFT_collections").delete().eq("address", "0xED5AF388653567Af2F388E6224dC7C4b3241C544").execute()
+def NFT_owned_by_wallet(list_):
+    cleaned_list = []
+    for dictionary in list_:
+        temp_dict = dict()
+        temp_dict.update({'wallet_address': dictionary['walletAddress']})
+        sub_list = dictionary['ownedNfts']
+        temp_list = []
+        for small_dict in sub_list:
+            temp_list.append({'collection_addr':small_dict['contract']['address'], 'tokenID': int(small_dict['id']['tokenId'], 16)})
+        temp_dict.update({'assets': temp_list})
+        cleaned_list.append(temp_dict)
+    cleaned_list.pop(4)  # insanely large number removed 
+    return cleaned_list
 
 
-def main():
-    url: str = os.environ.get("SUPABASE_URL")
-    key: str = os.environ.get("SUPABASE_KEY")
-    supabase: Client = create_client(url, key)
+# collection metadata
+contractMedata = nftCollections(base_url, bored_ape)
 
-    # collection_data = nftCollections(base_url, azuki)
-    tokens_inCollection = get_tokenData(nfts_for_collection(base_url, bored_ape))
-    
-    # insertData(supabase, collection_data)
-    insertData(supabase, tokens_inCollection, "collection_items")
-    # deleteRow(supabase)
-    displayRows(supabase, "NFT_collections")
-    print("\n")
-    displayRows(supabase, "collection_items")
-    
-main()
+# tokens in a collection
+tokens = get_tokenData(nfts_for_collection(base_url, bored_ape))
+
+# NFTs owned by wallets
+wallets = getOwnersfor_collection(bored_ape)
+nfts_in_wallet = NFT_owned_by_wallet(wallet_info(wallets))
